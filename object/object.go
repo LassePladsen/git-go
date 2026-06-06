@@ -24,7 +24,7 @@ type Object struct {
 func HashToPath(hash string) string {
 	dir := hash[0:2]
 	filename := hash[2:]
-	return fmt.Sprintf(".git/objects/%v/%v}", dir, filename)
+	return fmt.Sprintf(".git/objects/%v/%v", dir, filename)
 }
 
 // Read file and decompresses
