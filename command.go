@@ -2,13 +2,18 @@ package main
 
 import (
 	"errors"
-	"os"
 	"mygit/object"
+	"os"
 )
 
 type Output = []byte
 type Args = []string
 type Command = func(args Args) (Output, error)
+
+var commands = map[string]Command{
+	"init":     initGit,
+	"cat-file": catFile,
+}
 
 func initGit(_ Args) (output Output, err error) {
 	if err = os.Mkdir(".git", 0775); err != nil {

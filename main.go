@@ -15,12 +15,10 @@ func main() {
 	var output Output
 	var err error
 	var commandFn Command
-	switch command := os.Args[1]; command {
-	case "init":
-		// disabled for safety
-		// commandFn = initGit
-	default:
-		fmt.Fprintf(os.Stderr, "Unknown command %s\n", command)
+	commandName := os.Args[1]
+	commandFn, ok := commands[commandName]
+	if !ok {
+		fmt.Fprintf(os.Stderr, "unknown command %s\n", commandName)
 		os.Exit(1)
 	}
 
