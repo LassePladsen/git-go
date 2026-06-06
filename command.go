@@ -38,10 +38,7 @@ func initGit(_ Args) (output Output) {
 
 // Get file contents
 func catFile(args Args) Output {
-	printHelp := func() {
-		fmt.Println("usage: mygit cat-file <object_hash>")
-		return
-	}
+	helpMsg := "usage: mygit cat-file <object_hash>"
 	// Get blob hash from positional arg
 	var hash string
 	for _, arg := range args[2:] {
@@ -53,7 +50,7 @@ func catFile(args Args) Output {
 	}
 	
 	if hash == "" {
-		printHelp()
+		fmt.Println(helpMsg)
 		os.Exit(0)
 	}
 	if len(hash) < 3 {
@@ -64,13 +61,14 @@ func catFile(args Args) Output {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
-	fmt.Println("LP object: ", obj)
 	return obj.Contents
 }
 
-/*
+	/*
+// TODO:
 // Hash file to object
 func hash_object(args Args) (Output, error) {
+	helpMsg := "usage: mygit hash-object <file_path>"
     // Get path from positional arg
 	var out Output
 	var path string
@@ -82,29 +80,18 @@ func hash_object(args Args) (Output, error) {
 		}
 	}
 	if path == "" {
-		return out, errors.New("Missing hash")
+		fmt.Println(helpMsg)
+		os.Exit(0)
 	}
-    for arg in &args[2..] {
-        // Flag argument, skip for now. TODO: support flags?
-        if arg.starts_with('-') {
-            continue;
-        }
-        path = Some(arg);
-    }
-    let Some(path) = path else {
-        println!("Missing path");
-        return;
-    };
 
     // Read file
-    let bytes = match fs::read(path) {
-        Ok(bytes) => bytes,
-        Err(err) => {
-            println!("{err}");
-            return;
-        }
-    };
+	file, err := os.Open(path)
+	if err != nil {
+		return
+	}
+	defer file.Close()
     let object = Object {contents: bytes, kind: ObjectKind::Blob, size: bytes.len(): usize};
+return 
 }
 
 /// Inspect tree object

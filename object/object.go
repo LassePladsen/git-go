@@ -1,13 +1,12 @@
 package object
 
 import (
-	"compress/zlib"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"strconv"
+	"mygit/file"
 )
 
 // Object kind enum
@@ -17,14 +16,6 @@ const (
 	KindBlob Kind = "blob"
 	KindTree Kind = "tree"
 )
-
-type UnsupportedKindError struct {
-	Kind Kind
-}
-
-func (e UnsupportedKindError) Error() string {
-	return fmt.Sprintf("unsupported object kind: %q", e.Kind)
-}
 
 type Object struct {
 	Kind     Kind
@@ -39,31 +30,11 @@ func HashToPath(hash string) string {
 	return fmt.Sprintf(".git/objects/%v/%v", dir, filename)
 }
 
-// Read file and decompresses
-func readCompressedFile(path string) (data []byte, err error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return
-	}
-	defer file.Close()
-
-	zr, err := zlib.NewReader(file)
-	if err != nil {
-		return
-	}
-	defer zr.Close()
-
-	data, err = io.ReadAll(zr)
-	if err != nil {
-		return
-	}
-	return
-}
 
 // Reads object to Object struct
 func Open(hash string) (*Object, error) {
 	filePath := HashToPath(hash)
-	data, err := readCompressedFile(filePath)
+	data, err := file.ReadCompressedFile(filePath)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			fmt.Fprintf(os.Stderr, "Not a valid object name: %v\n", hash)
@@ -92,7 +63,7 @@ func Open(hash string) (*Object, error) {
 	case "tree":
 		obj.Kind = KindTree
 	default:
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintf(os.Stderr, "Unsupported kind %v\n", kind)
 		os.Exit(1)
 	}
 
