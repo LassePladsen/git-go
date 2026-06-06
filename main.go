@@ -21,7 +21,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	
 	if output = commandFn(os.Args); len(output) != 0 {
 		os.Stdout.Write(output)
 	}

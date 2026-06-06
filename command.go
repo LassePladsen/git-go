@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"mygit/file"
 	"mygit/object"
 	"os"
 )
@@ -11,8 +12,9 @@ type Args = []string
 type Command = func(args Args) Output
 
 var commands = map[string]Command{
-	"init":     initGit,
-	"cat-file": catFile,
+	"init":        initGit,
+	"cat-file":    catFile,
+	"hash-object": hashObject,
 }
 
 func initGit(_ Args) (output Output) {
@@ -48,13 +50,13 @@ func catFile(args Args) Output {
 			break
 		}
 	}
-	
+
 	if hash == "" {
 		fmt.Println(helpMsg)
 		os.Exit(0)
 	}
 	if len(hash) < 3 {
-		fmt.Fprintln(os.Stderr, "Not a valid object name: %v", hash)
+		fmt.Fprintf(os.Stderr, "Not a valid object name: %v", hash)
 		os.Exit(1)
 	}
 	obj, err := object.Open(hash)
@@ -64,13 +66,11 @@ func catFile(args Args) Output {
 	return obj.Contents
 }
 
-	/*
 // TODO:
 // Hash file to object
-func hash_object(args Args) (Output, error) {
+func hashObject(args Args) Output {
 	helpMsg := "usage: mygit hash-object <file_path>"
-    // Get path from positional arg
-	var out Output
+	// Get path from positional arg
 	var path string
 	for _, arg := range args[2:] {
 		// Flag argument, skip for now. TODO: support flags?
@@ -84,16 +84,24 @@ func hash_object(args Args) (Output, error) {
 		os.Exit(0)
 	}
 
-    // Read file
-	file, err := os.Open(path)
+	// Read file
+	data, err := file.ReadFile(path)
 	if err != nil {
-		return
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
-	defer file.Close()
-    let object = Object {contents: bytes, kind: ObjectKind::Blob, size: bytes.len(): usize};
-return 
+
+	// Write to object
+	obj, err := object.Write(data)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
+	return Output(fmt.Sprintln(obj.Hash))
 }
 
+/*
 /// Inspect tree object
 func ls_tree(args Args) {
     // Get tree hash input from positional arg

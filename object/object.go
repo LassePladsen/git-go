@@ -1,12 +1,16 @@
 package object
 
 import (
+	"bytes"
+	"compress/zlib"
+	"crypto/sha1"
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
-	"strconv"
 	"mygit/file"
+	"os"
+	"path/filepath"
+	"strconv"
 )
 
 // Object kind enum
@@ -18,6 +22,7 @@ const (
 )
 
 type Object struct {
+	Hash     string
 	Kind     Kind
 	Size     uint
 	Contents []byte
@@ -29,7 +34,6 @@ func HashToPath(hash string) string {
 	filename := hash[2:]
 	return fmt.Sprintf(".git/objects/%v/%v", dir, filename)
 }
-
 
 // Reads object to Object struct
 func Open(hash string) (*Object, error) {
@@ -44,7 +48,7 @@ func Open(hash string) (*Object, error) {
 		os.Exit(1)
 	}
 
-	// Header: <object_kind><size>null_byte
+	// Header: <object_kind> <size>\0
 	// Read object kind up to a space
 	var buf []byte
 	var i int
@@ -56,7 +60,7 @@ func Open(hash string) (*Object, error) {
 		buf = append(buf, b)
 	}
 
-	var obj Object
+	obj := Object{Hash: hash}
 	switch kind := Kind(buf); kind {
 	case "blob":
 		obj.Kind = KindBlob
@@ -89,8 +93,32 @@ func Open(hash string) (*Object, error) {
 	return &obj, nil
 }
 
-// Compress data and write to object file
+// Compress data and write to object file, also returns the Object
 func Write(data []byte) (*Object, error) {
-	// TODO:
-	return nil, nil
+	// Object format: <object_kind> <size>\0<data>
+	kind := KindBlob // for now only supports blobs. TODO:
+	size := len(data)
+	out := fmt.Sprintf("%v %v\x00%v", kind, size, string(data))
+	sum := sha1.Sum([]byte(out))
+	hash := fmt.Sprintf("%x", sum)
+	obj := Object{Kind: kind, Size: uint(size), Contents: data, Hash: hash}
+
+	// Compress hash and write to file
+	var buf bytes.Buffer
+	zw := zlib.NewWriter(&buf)
+	zw.Write([]byte(hash))
+
+	path := HashToPath(hash)
+	dir := filepath.Dir(path)
+	if !file.Exists(dir) {
+		if err := os.Mkdir(dir, 0775); err != nil {
+			fmt.Fprintf(os.Stderr, "Could not mkdir for object '%v': %v\n", path, err)
+			os.Exit(1)
+		}
+	}
+	if err := os.WriteFile(path, []byte(hash), 0664); err != nil {
+		fmt.Fprintf(os.Stderr, "Could not write to file: %v\n", path)
+		os.Exit(1)
+	}
+	return &obj, nil
 }
