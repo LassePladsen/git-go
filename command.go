@@ -38,7 +38,7 @@ func catFile(args Args) (output Output, err error) {
 	var hash string
 	for _, arg := range args[2:] {
 		// Flag argument, skip for now. TODO: support flags?
-		if arg[0] == byte('-') {
+		if arg[0] != byte('-') {
 			hash = arg
 			break
 		}
