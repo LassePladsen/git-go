@@ -56,6 +56,7 @@ func Open(hash string) (obj Object, err error) {
 		return
 	}
 	fmt.Println("LP data: ", data)
+	// TODO: 
 	return
 
 	/*
