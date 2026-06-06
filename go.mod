@@ -1,3 +1,3 @@
-module github.com/codecrafters-io/git-starter-go
+module mygit
 
 go 1.26.0

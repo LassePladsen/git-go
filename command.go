@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"os"
+	"mygit/object"
 )
 
 type Output = []byte
@@ -25,34 +27,36 @@ func initGit(_ Args) (output Output, err error) {
 	return
 }
 
-/*
 // Get file contents
-pub fn cat_file(args: &[String]) ->  {
-    // Get blob hash from positional arg
-    let mut hash: Option<&str> = None;
-    for arg in &args[2..] {
-        // Flag argument, skip for now. TODO: support flags?
-        if arg.starts_with('-') {
-            continue;
-        }
-        hash = Some(arg);
-    }
-    let Some(hash) = hash else {
-        return "Missing hash\n".into();
-    };
-    if hash.len() < 3 {
-        return "Hash name too short\n".into();
-    }
-    let object = match Object::read(hash) {
-        Ok(object) => object,
-        Err(e) => return format!("{e}").into(),
-    };
-    object.contents
+func cat_file(args Args) (output Output, err error) {
+	// Get blob hash from positional arg
+	var hash string
+	for _, arg := range args[2:] {
+		// Flag argument, skip for now. TODO: support flags?
+		if arg[0] == byte('-') {
+			hash = arg
+			break
+		}
+	}
+	if hash == "" {
+		err = errors.New("Missing hash")
+		return
+	}
+	if len(hash) < 3 {
+		err = errors.New("Hash name too short")
+		return
+	}
+	object, err := object.Read(hash)
+	if err != nil {
+		return
+	}
+	output = object.contents
+	return
 }
 
 /*
 /// Hash object to blob
-pub fn hash_object(args: &[String]) {
+func hash_object(args Args) {
     // Get path from positional arg
     let mut path: Option<&str> = None;
     for arg in &args[2..] {
@@ -79,7 +83,7 @@ pub fn hash_object(args: &[String]) {
 }
 
 /// Inspect tree object
-pub fn ls_tree(args: &[String]) {
+func ls_tree(args Args) {
     // Get tree hash input from positional arg
     let mut hash: Option<&str> = None;
     let mut print_name_only = false;
