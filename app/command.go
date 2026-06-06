@@ -5,8 +5,10 @@ import (
 )
 
 type Output = []byte
+type Args = []string
+type Command = func(args Args) (Output, error)
 
-func init_git() (output Output, err error) {
+func initGit(_ Args) (output Output, err error) {
 	if err = os.Mkdir(".git", 0775); err != nil {
 		return
 	}
@@ -24,8 +26,8 @@ func init_git() (output Output, err error) {
 }
 
 /*
-/// Read blob
-pub fn cat_file(args: &[String]) -> Output {
+// Get file contents
+pub fn cat_file(args: &[String]) ->  {
     // Get blob hash from positional arg
     let mut hash: Option<&str> = None;
     for arg in &args[2..] {
@@ -48,6 +50,7 @@ pub fn cat_file(args: &[String]) -> Output {
     object.contents
 }
 
+/*
 /// Hash object to blob
 pub fn hash_object(args: &[String]) {
     // Get path from positional arg

@@ -14,14 +14,17 @@ func main() {
 
 	var output Output
 	var err error
+	var commandFn Command
 	switch command := os.Args[1]; command {
 	case "init":
 		// disabled for safety
-		// output, err = init_git() 
-
+		// commandFn = initGit
 	default:
-		err = fmt.Errorf("Unknown command %s", command)
+		fmt.Fprintf(os.Stderr, "Unknown command %s\n", command)
+		os.Exit(1)
 	}
+
+	output, err = commandFn(os.Args)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
