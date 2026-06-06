@@ -28,7 +28,7 @@ func initGit(_ Args) (output Output, err error) {
 }
 
 // Get file contents
-func cat_file(args Args) (output Output, err error) {
+func catFile(args Args) (output Output, err error) {
 	// Get blob hash from positional arg
 	var hash string
 	for _, arg := range args[2:] {
@@ -46,11 +46,11 @@ func cat_file(args Args) (output Output, err error) {
 		err = errors.New("Hash name too short")
 		return
 	}
-	object, err := object.Read(hash)
+	_, err = object.Open(hash)
 	if err != nil {
 		return
 	}
-	output = object.contents
+	// output = object.contents
 	return
 }
 
