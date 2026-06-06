@@ -38,7 +38,7 @@ func initGit(_ Args) (output Output) {
 	return
 }
 
-// Get file contents
+// return object contents
 func catFile(args Args) Output {
 	helpMsg := "usage: mygit cat-file <object_hash>"
 	// Get blob hash from positional arg
