@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"mygit/object"
 	"os"
@@ -9,33 +8,40 @@ import (
 
 type Output = []byte
 type Args = []string
-type Command = func(args Args) (Output, error)
+type Command = func(args Args) Output
 
 var commands = map[string]Command{
 	"init":     initGit,
 	"cat-file": catFile,
 }
 
-func initGit(_ Args) (output Output, err error) {
-	if err = os.Mkdir(".git", 0775); err != nil {
-		return
+func initGit(_ Args) (output Output) {
+	if err := os.Mkdir(".git", 0775); err != nil {
+		fmt.Fprintln(os.Stderr, "Could not mkdir for .git")
+		os.Exit(1)
 	}
-	if err = os.Mkdir(".git/objects", 0775); err != nil {
-		return
+	if err := os.Mkdir(".git/objects", 0775); err != nil {
+		fmt.Fprintln(os.Stderr, "Could not mkdir: .git/objects")
+		os.Exit(1)
 	}
-	if err = os.Mkdir(".git/refs", 0775); err != nil {
-		return
+	if err := os.Mkdir(".git/refs", 0775); err != nil {
+		fmt.Fprintln(os.Stderr, "Could not mkdir: .git/refs")
+		os.Exit(1)
 	}
-	if err = os.WriteFile(".git/HEAD", []byte("ref: refs/heads/main\n"), 0664); err != nil {
-		return
+	if err := os.WriteFile(".git/HEAD", []byte("ref: refs/heads/main\n"), 0664); err != nil {
+		fmt.Fprintln(os.Stderr, "Could not write to file: .git/HEAD")
+		os.Exit(1)
 	}
 	output = []byte("Initialized git directory")
 	return
 }
 
 // Get file contents
-func catFile(args Args) (Output, error) {
-	var out Output
+func catFile(args Args) Output {
+	printHelp := func() {
+		fmt.Println("usage: mygit cat-file <object_hash>")
+		return
+	}
 	// Get blob hash from positional arg
 	var hash string
 	for _, arg := range args[2:] {
@@ -45,26 +51,39 @@ func catFile(args Args) (Output, error) {
 			break
 		}
 	}
+	
 	if hash == "" {
-		return out, errors.New("Missing hash")
+		printHelp()
+		os.Exit(0)
 	}
 	if len(hash) < 3 {
-		return out, errors.New("Hash name too short")
+		fmt.Fprintln(os.Stderr, "Not a valid object name: %v", hash)
+		os.Exit(1)
 	}
 	obj, err := object.Open(hash)
 	if err != nil {
-		return out, err
+		fmt.Fprintln(os.Stderr, err)
 	}
 	fmt.Println("LP object: ", obj)
-	out = obj.Contents
-	return out, nil
+	return obj.Contents
 }
 
 /*
-/// Hash object to blob
-func hash_object(args Args) {
+// Hash file to object
+func hash_object(args Args) (Output, error) {
     // Get path from positional arg
-    let mut path: Option<&str> = None;
+	var out Output
+	var path string
+	for _, arg := range args[2:] {
+		// Flag argument, skip for now. TODO: support flags?
+		if arg[0] != byte('-') {
+			path = arg
+			break
+		}
+	}
+	if path == "" {
+		return out, errors.New("Missing hash")
+	}
     for arg in &args[2..] {
         // Flag argument, skip for now. TODO: support flags?
         if arg.starts_with('-') {

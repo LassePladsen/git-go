@@ -13,7 +13,6 @@ func main() {
 	}
 
 	var output Output
-	var err error
 	var commandFn Command
 	commandName := os.Args[1]
 	commandFn, ok := commands[commandName]
@@ -22,12 +21,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	output, err = commandFn(os.Args)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	if len(output) != 0 {
+	
+	if output = commandFn(os.Args); len(output) != 0 {
 		os.Stdout.Write(output)
 	}
 }

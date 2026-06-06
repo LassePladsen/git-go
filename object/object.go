@@ -2,8 +2,10 @@ package object
 
 import (
 	"compress/zlib"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"strconv"
 )
@@ -63,7 +65,12 @@ func Open(hash string) (*Object, error) {
 	filePath := HashToPath(hash)
 	data, err := readCompressedFile(filePath)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, fs.ErrNotExist) {
+			fmt.Fprintf(os.Stderr, "Not a valid object name: %v\n", hash)
+		} else {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		os.Exit(1)
 	}
 
 	// Header: <object_kind><size>null_byte
@@ -85,7 +92,8 @@ func Open(hash string) (*Object, error) {
 	case "tree":
 		obj.Kind = KindTree
 	default:
-		return nil, UnsupportedKindError{kind}
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 
 	// Read size up to null byte
