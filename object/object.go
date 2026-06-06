@@ -5,19 +5,29 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 )
 
-type ObjectType string
+// Object kind enum
+type Kind string
 
 const (
-	TypeBlob ObjectType = "blob"
-	TypeTree ObjectType = "tree"
+	KindBlob Kind = "blob"
+	KindTree Kind = "tree"
 )
 
+type UnsupportedKindError struct {
+	Kind Kind
+}
+
+func (e UnsupportedKindError) Error() string {
+	return fmt.Sprintf("unsupported object kind: %q", e.Kind)
+}
+
 type Object struct {
-	kind     ObjectType
-	size     uint
-	contents []byte
+	Kind     Kind
+	Size     uint
+	Contents []byte
 }
 
 // Creates file path from object hash. Example: 1eadkl351341k123jlk21WDad -> .git/objects/1e/adkl351341k123jlk21WDad
@@ -49,89 +59,59 @@ func readCompressedFile(path string) (data []byte, err error) {
 }
 
 // Reads object to Object struct
-func Open(hash string) (obj Object, err error) {
+func Open(hash string) (*Object, error) {
 	filePath := HashToPath(hash)
 	data, err := readCompressedFile(filePath)
 	if err != nil {
-		return
+		return nil, err
 	}
-	fmt.Println("LP data: ", data)
-	// TODO: 
-	return
 
-	/*
-		// Header: <object_type><size>null_byte
-		// Read type up to space
-		let mut type_buf = Vec::new();
-		while let Some(byte) = decompressed.pop_front() {
-			if b' ' == byte {
-				break;
-			}
-			type_buf.push(byte);
+	// Header: <object_kind><size>null_byte
+	// Read object kind up to a space
+	var buf []byte
+	var i int
+	var b byte
+	for i, b = range data {
+		if b == ' ' {
+			break
 		}
-		// convert type to string and interpret it
-		let type_: ObjectType =
-		match str::from_utf8(&type_buf).expect("Invalid UTF in object type buffer") {
-		"blob" => ObjectType::Blob,
-		"tree" => ObjectType::Tree,
-		s => panic!("Invalid type: {s}"),
-	*/
-}
-
-/*
-// Read size up to null byte
-let mut size_buf = Vec::new();
-while let Some(byte) = decompressed.pop_front() {
-	if 0 == byte {
-		break;
+		buf = append(buf, b)
 	}
-	size_buf.push(byte);
-}
-let size: usize = str::from_utf8(&size_buf)
-.expect("Invalid UTF in size type buffer")
-.parse()
-.expect("Could not parse size byte to integer");
 
-// Read rest of contents
-let contents = Vec::from(decompressed);
+	var obj Object
+	switch kind := Kind(buf); kind {
+	case "blob":
+		obj.Kind = KindBlob
+	case "tree":
+		obj.Kind = KindTree
+	default:
+		return nil, UnsupportedKindError{kind}
+	}
 
-Ok(Object {
-	size,
-	type: type_,
-	contents,
-})
-}
-}
+	// Read size up to null byte
+	buf = buf[:0]
+	rest := data[i+1:] // skip the space with i+1
+	for i, b = range rest {
+		if b == 0 {
+			break
+		}
+		buf = append(buf, b)
 
-/*
-impl Object {
-func is_type(&self, type: ObjectType) -> bool {
-self.type == type
-}
+	}
+	size, err := strconv.Atoi(string(buf))
+	if err != nil {
+		return nil, err
+	}
+	obj.Size = uint(size)
 
-/// Ensures the object is of the given type by returning Err with premade message.
-func ensure_type(&self, type: ObjectType) -> Result<()> {
-if !self.is_type(type) {
-bail!(
-"Unexpected object type '{:?}', expected '{:?}'\n",
-self.type,
-ObjectType::Blob
-);
-}
-Ok(())
-}
+	// The rest is the actual object contents, we are done with header after null byte
+	// we don't actually need the size since i've loaded the entire data into a slice
+	obj.Contents = rest[i+1:]
+	return &obj, nil
 }
 
-impl Object {
-func write() -> Object {
-todo!()
+// Compress data and write to object file
+func Write(data []byte) (*Object, error) {
+	// TODO:
+	return nil, nil
 }
-
-}
-
-func get_path(object_hash: &str) -> String {
-let dir = &object_hash[0..2];
-let filename = &object_hash[2..];
-format!(".git/objects/{dir}/{filename}")
-}
-*/

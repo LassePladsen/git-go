@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"mygit/object"
 	"os"
 )
@@ -33,7 +34,8 @@ func initGit(_ Args) (output Output, err error) {
 }
 
 // Get file contents
-func catFile(args Args) (output Output, err error) {
+func catFile(args Args) (Output, error) {
+	var out Output
 	// Get blob hash from positional arg
 	var hash string
 	for _, arg := range args[2:] {
@@ -44,19 +46,18 @@ func catFile(args Args) (output Output, err error) {
 		}
 	}
 	if hash == "" {
-		err = errors.New("Missing hash")
-		return
+		return out, errors.New("Missing hash")
 	}
 	if len(hash) < 3 {
-		err = errors.New("Hash name too short")
-		return
+		return out, errors.New("Hash name too short")
 	}
-	_, err = object.Open(hash)
+	obj, err := object.Open(hash)
 	if err != nil {
-		return
+		return out, err
 	}
-	// output = object.contents
-	return
+	fmt.Println("LP object: ", obj)
+	out = obj.Contents
+	return out, nil
 }
 
 /*
