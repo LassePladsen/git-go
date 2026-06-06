@@ -66,7 +66,6 @@ func catFile(args Args) Output {
 	return obj.Contents
 }
 
-// TODO:
 // Hash file to object
 func hashObject(args Args) Output {
 	helpMsg := "usage: mygit hash-object <file_path>"
@@ -101,7 +100,7 @@ func hashObject(args Args) Output {
 	return Output(fmt.Sprintln(obj.Hash))
 }
 
-/*
+/* TODO: 
 /// Inspect tree object
 func ls_tree(args Args) {
     // Get tree hash input from positional arg
