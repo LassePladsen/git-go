@@ -97,10 +97,12 @@ func Open(hash string) (*Object, error) {
 }
 
 // Compress data and write to object file, also returns the Object
-func Write(data []byte) (*Object, error) {
+func Write(data []byte, kind Kind) (*Object, error) {
 	// Object format: <object_kind> <size>\0<data>
-	kind := KindBlob // for now only supports blobs. TODO:
 	size := len(data)
+
+	// TODO: for tree kind, need to follow dir recursively and write all objects...
+
 	objData := fmt.Appendf(nil, "%v %v\x00%v", kind, size, string(data))
 	sum := sha1.Sum(objData)
 	hash := fmt.Sprintf("%x", sum)

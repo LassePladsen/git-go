@@ -91,15 +91,30 @@ func hashObject(args []string) []byte {
 		os.Exit(0)
 	}
 
-	// Read file
-	data, err := file.ReadFile(path)
+	fileInfo, err := os.Stat(path)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
+	var kind object.Kind
+	var data []byte
+	if fileInfo.IsDir() {
+		// TODO: hash dir to tree?
+		kind = object.KindTree
+
+	} else { // file
+		kind = object.KindBlob
+		// Read file
+		data, err = file.ReadFile(path)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}
+
 	// Write to object
-	obj, err := object.Write(data)
+	obj, err := object.Write(data, kind)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -181,6 +196,7 @@ func writeTree(args []string) []byte {
 	}
 
 	// Iterate over files in cwd, create blobs for files and trees for dirs
+	// TODO: this loop
 	for _, dirEntry := range files {
 		// TODO: implement gitignore
 		if dirEntry.IsDir() {
@@ -191,7 +207,7 @@ func writeTree(args []string) []byte {
 				fmt.Fprintf(os.Stderr, "Could not read file in working directory to write tree: %v\n", err)
 				os.Exit(1)
 			}
-			obj, err := object.Write(data)
+			obj, err := object.Write(data, object.KindBlob)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Could not write data for file '%v' to blob for write tree: %v\n", dirEntry.Name(), err)
 				os.Exit(1)
