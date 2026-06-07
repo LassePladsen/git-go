@@ -244,6 +244,7 @@ func WriteTree(path string) (*Object, error) {
 	}
 	fmt.Println()
 
+	// TODO: sorting doesnt work, figureout why. then revert to using make above
 	// // List out entry by alphabetical NAME (not hash)
 	// slices.SortFunc(entries, func(a, b *tmpEntry) int {
 	// 	if a == nil || b == nil {return 0}
