@@ -29,6 +29,7 @@ func ParseKind(s string) (Kind, error) {
 }
 
 type Object struct {
+	Path     string
 	Hash     string
 	Kind     Kind
 	Size     uint
@@ -36,7 +37,7 @@ type Object struct {
 }
 
 func (o Object) String() string {
-	return fmt.Sprintf("{%v %v (size %v): %v}", o.Hash, o.Kind, o.Size, string(o.Contents))
+	return fmt.Sprintf("Object{\n\tPath: %v\n\tHash:% v\n\tKind: %v\n\tSize: %v\n\tContents: %v\n}", o.Path, o.Hash, o.Kind, o.Size, string(o.Contents))
 }
 
 // Creates file path from object hash. Example: 1eadkl351341k123jlk21WDad -> .git/objects/1e/adkl351341k123jlk21WDad
@@ -56,7 +57,7 @@ func Open(hash string) (*Object, error) {
 
 	// Header: <object_kind> <size>\0
 	// Read object kind up to a space
-	obj := Object{Hash: hash}
+	obj := Object{Hash: hash, Path: filePath}
 	var buf []byte
 	var i int
 	var b byte
@@ -114,6 +115,7 @@ func Write(data []byte) (*Object, error) {
 	zw.Close()
 
 	path := HashToPath(hash)
+	obj.Path = path
 	dir := filepath.Dir(path)
 	if !file.Exists(dir) {
 		if err := os.Mkdir(dir, 0775); err != nil {
