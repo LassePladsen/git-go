@@ -12,7 +12,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	var output Output
+	var output []byte
 	var commandFn Command
 	commandName := os.Args[1]
 	commandFn, ok := commands[commandName]

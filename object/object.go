@@ -6,7 +6,6 @@ import (
 	"crypto/sha1"
 	"errors"
 	"fmt"
-	"io/fs"
 	"mygit/file"
 	"os"
 	"path/filepath"
@@ -40,12 +39,7 @@ func Open(hash string) (*Object, error) {
 	filePath := HashToPath(hash)
 	data, err := file.ReadCompressedFile(filePath)
 	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			fmt.Fprintf(os.Stderr, "Not a valid object name: %v\n", hash)
-		} else {
-			fmt.Fprintln(os.Stderr, err)
-		}
-		os.Exit(1)
+		return nil, err
 	}
 
 	// Header: <object_kind> <size>\0
@@ -67,8 +61,7 @@ func Open(hash string) (*Object, error) {
 	case "tree":
 		obj.Kind = KindTree
 	default:
-		fmt.Fprintf(os.Stderr, "Unsupported kind %v\n", kind)
-		os.Exit(1)
+		return nil, fmt.Errorf("Unsupported kind %v", kind)
 	}
 
 	// Read size up to null byte
@@ -112,13 +105,77 @@ func Write(data []byte) (*Object, error) {
 	dir := filepath.Dir(path)
 	if !file.Exists(dir) {
 		if err := os.Mkdir(dir, 0775); err != nil {
-			fmt.Fprintf(os.Stderr, "Could not mkdir for object '%v': %v\n", path, err)
-			os.Exit(1)
+			return nil, fmt.Errorf("Could not mkdir for object '%v': %w", path, err)
 		}
 	}
 	if err := os.WriteFile(path, []byte(hash), 0664); err != nil {
-		fmt.Fprintf(os.Stderr, "Could not write to file: %v\n", path)
-		os.Exit(1)
+		return nil, fmt.Errorf("Could not write to file '%v': %w", path, err)
 	}
 	return &obj, nil
+}
+
+type Tree struct {
+	Obj     Object
+	Entries []TreeEntry
+}
+type TreeEntry struct {
+	Mode   []byte
+	Name   []byte
+	Hash   []byte
+	Object *Object
+}
+
+// Parse tree entries. if openEntryObjects then each entry object is opened and read into TreeEntry.Object
+func ReadTree(treeObj *Object, openEntryObjects bool) (*Tree, error) {
+	if treeObj.Kind != KindTree {
+		return nil, errors.New("Not a tree object")
+	}
+	// for now only one entry. TODO: generalize entries with loop
+	// read format: <mode> <name>\0<20_byte_object_hash>
+	tree := Tree{Obj: *treeObj}
+	var entry TreeEntry
+	var i int
+	var b byte
+
+	// Loop entries until rest data is empty
+	rest := treeObj.Contents
+	for {
+		// Read mode
+		for i, b = range rest {
+			if b == ' ' {
+				break
+			}
+			entry.Mode = append(entry.Mode, b)
+
+		}
+
+		// Read name
+		rest := treeObj.Contents[i+1:] // skip space with i+1
+		for i, b = range rest {
+			if b == 0 {
+				break
+			}
+			entry.Name = append(entry.Name, b)
+
+		}
+
+		// Read 20 byte hash (its not stored as hex)
+		entry.Hash, rest = rest[i+1:i+21], rest[i+21:]
+
+		// Unless openEntryObjects, we need to open each object
+		if openEntryObjects {
+			entryObj, err := Open(fmt.Sprintf("%x", entry.Hash))
+			if err != nil {
+				return nil, fmt.Errorf("Could not open tree entry object '%x': %w", entry.Hash, err)
+			}
+			entry.Object = entryObj
+		}
+
+		tree.Entries = append(tree.Entries, entry)
+		if len(rest) == 0 {
+			break
+		}
+	}
+	return &tree, nil
+
 }

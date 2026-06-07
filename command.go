@@ -1,23 +1,25 @@
 package main
 
 import (
+	"encoding/hex"
+	"errors"
 	"fmt"
+	"io/fs"
 	"mygit/file"
 	"mygit/object"
 	"os"
 )
 
-type Output = []byte
-type Args = []string
-type Command = func(args Args) Output
+type Command = func(args []string) []byte
 
 var commands = map[string]Command{
 	"init":        initGit,
 	"cat-file":    catFile,
 	"hash-object": hashObject,
+	"ls-tree":     lsTree,
 }
 
-func initGit(_ Args) (output Output) {
+func initGit(_ []string) (output []byte) {
 	if err := os.Mkdir(".git", 0775); err != nil {
 		fmt.Fprintln(os.Stderr, "Could not mkdir for .git")
 		os.Exit(1)
@@ -39,7 +41,7 @@ func initGit(_ Args) (output Output) {
 }
 
 // return object contents
-func catFile(args Args) Output {
+func catFile(args []string) []byte {
 	helpMsg := "usage: mygit cat-file <object_hash>"
 	// Get blob hash from positional arg
 	var hash string
@@ -61,13 +63,18 @@ func catFile(args Args) Output {
 	}
 	obj, err := object.Open(hash)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		if errors.Is(err, fs.ErrNotExist) {
+			fmt.Fprintf(os.Stderr, "Not a valid object name: %v\n", hash)
+		} else {
+			fmt.Fprintln(os.Stderr, err)
+		}
+		os.Exit(1)
 	}
 	return obj.Contents
 }
 
 // Hash file to object
-func hashObject(args Args) Output {
+func hashObject(args []string) []byte {
 	helpMsg := "usage: mygit hash-object <file_path>"
 	// Get path from positional arg
 	var path string
@@ -97,34 +104,67 @@ func hashObject(args Args) Output {
 		os.Exit(1)
 	}
 
-	return Output(fmt.Sprintln(obj.Hash))
+	return fmt.Appendln(nil, obj.Hash)
 }
 
-/* TODO: 
-/// Inspect tree object
-func ls_tree(args Args) {
-    // Get tree hash input from positional arg
-    let mut hash: Option<&str> = None;
-    let mut print_name_only = false;
-    for arg in &args[2..] {
-        // Supports flag: --name-only
-        if "--name-only" == arg {
-            print_name_only = true;
-        }
-        if arg.starts_with('-') {
-            continue;
-        }
-        hash = Some(arg);
-    }
-    let Some(hash) = hash else {
-        println!("Missing hash");
-        return;
-    };
+// Inspect tree object
+// Tree structure: <object_kind> <size>\0<tree_entries>
+// where <tree_entries> is each a <mode> <name>\0<20_byte_object_hash>
+func lsTree(args []string) []byte {
+	helpMsg := "usage: mygit ls-tree [arguments] <object_hash>"
+	// Get tree hash input from positional arg
+	var hash string
+	nameOnly := false
+	for _, arg := range args[2:] {
+		// Supports flag: --name-only
+		if "--name-only" == arg {
+			nameOnly = true
+		}
+		if arg[0] != byte('-') {
+			hash = arg
+		}
+	}
 
-    // TODO: also support full print (where print_name_only=false)
+	if hash == "" {
+		fmt.Println(helpMsg)
+		os.Exit(0)
+	}
+	if len(hash) < 3 {
+		fmt.Fprintf(os.Stderr, "Not a valid object name: %v", hash)
+		os.Exit(1)
+	}
 
-    // Read file
-    let path = object::get_path(hash);
-    // let file = File
+	obj, err := object.Open(hash)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Could not read object: %v", err)
+		os.Exit(1)
+	}
+
+	tree, err := object.ReadTree(obj, !nameOnly)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
+	var out []byte
+	for _, entry := range tree.Entries {
+		if nameOnly {
+			// only output name
+			out = append(out, entry.Name...)
+		} else {
+			// output: <mode> <kind> <hash>    <name>
+			hash := make([]byte, hex.EncodedLen(len(entry.Hash)))
+			hex.Encode(hash, entry.Hash)
+
+			out = append(out, entry.Mode...)
+			out = append(out, ' ')
+			out = append(out, entry.Object.Kind...)
+			out = append(out, ' ')
+			out = append(out, hash...)
+			out = append(out, []byte("    ")...)
+			out = append(out, entry.Name...)
+		}
+	}
+
+	return fmt.Appendln(out)
 }
-*/
