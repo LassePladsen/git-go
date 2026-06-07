@@ -36,7 +36,7 @@ type Object struct {
 }
 
 func (o Object) String() string {
-	return fmt.Sprintf("%v (size %v): %v", o.Kind, o.Size, string(o.Contents))
+	return fmt.Sprintf("{%v %v (size %v): %v}", o.Hash, o.Kind, o.Size, string(o.Contents))
 }
 
 // Creates file path from object hash. Example: 1eadkl351341k123jlk21WDad -> .git/objects/1e/adkl351341k123jlk21WDad
@@ -100,15 +100,18 @@ func Write(data []byte) (*Object, error) {
 	// Object format: <object_kind> <size>\0<data>
 	kind := KindBlob // for now only supports blobs. TODO:
 	size := len(data)
-	out := fmt.Sprintf("%v %v\x00%v", kind, size, string(data))
-	sum := sha1.Sum([]byte(out))
+	objData := fmt.Appendf(nil, "%v %v\x00%v", kind, size, string(data))
+	sum := sha1.Sum(objData)
 	hash := fmt.Sprintf("%x", sum)
 	obj := Object{Kind: kind, Size: uint(size), Contents: data, Hash: hash}
 
-	// Compress hash and write to file
+	// Compress data and write to file
 	var buf bytes.Buffer
 	zw := zlib.NewWriter(&buf)
-	zw.Write([]byte(hash))
+	if _, err := zw.Write(objData); err != nil {
+		return nil, fmt.Errorf("Could not compress data for hash '%v': %w", hash, err)
+	}
+	zw.Close()
 
 	path := HashToPath(hash)
 	dir := filepath.Dir(path)
@@ -117,7 +120,7 @@ func Write(data []byte) (*Object, error) {
 			return nil, fmt.Errorf("Could not mkdir for object '%v': %w", path, err)
 		}
 	}
-	if err := os.WriteFile(path, []byte(hash), 0664); err != nil {
+	if err := os.WriteFile(path, buf.Bytes(), 0664); err != nil {
 		return nil, fmt.Errorf("Could not write to file '%v': %w", path, err)
 	}
 	return &obj, nil
