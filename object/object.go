@@ -130,37 +130,46 @@ func ReadTree(treeObj *Object, openEntryObjects bool) (*Tree, error) {
 	if treeObj.Kind != KindTree {
 		return nil, errors.New("Not a tree object")
 	}
-	// for now only one entry. TODO: generalize entries with loop
 	// read format: <mode> <name>\0<20_byte_object_hash>
 	tree := Tree{Obj: *treeObj}
-	var entry TreeEntry
-	var i int
-	var b byte
 
 	// Loop entries until rest data is empty
 	rest := treeObj.Contents
-	for {
+	for len(rest) > 0 {
+		entry := TreeEntry{}
+
 		// Read mode
-		for i, b = range rest {
+		var i int
+		for i = range rest {
+			b := rest[i]
 			if b == ' ' {
 				break
 			}
 			entry.Mode = append(entry.Mode, b)
-
 		}
+		if i >= len(rest) || rest[i] != ' ' {
+			return nil, errors.New("Malformed tree entry mode")
+		}
+		rest = rest[i+1:] // skip space
 
 		// Read name
-		rest := treeObj.Contents[i+1:] // skip space with i+1
-		for i, b = range rest {
+		for i = range rest {
+			b := rest[i]
 			if b == 0 {
 				break
 			}
 			entry.Name = append(entry.Name, b)
-
 		}
+		if i >= len(rest) || rest[i] != 0 {
+			return nil, errors.New("Malformed tree entry name")
+		}
+		rest = rest[i+1:] // skip null byte
 
 		// Read 20 byte hash (its not stored as hex)
-		entry.Hash, rest = rest[i+1:i+21], rest[i+21:]
+		if len(rest) < 20 {
+			return nil, errors.New("Malformed tree entry hash")
+		}
+		entry.Hash, rest = rest[:20], rest[20:]
 
 		// Unless openEntryObjects, we need to open each object
 		if openEntryObjects {
@@ -172,9 +181,6 @@ func ReadTree(treeObj *Object, openEntryObjects bool) (*Tree, error) {
 		}
 
 		tree.Entries = append(tree.Entries, entry)
-		if len(rest) == 0 {
-			break
-		}
 	}
 	return &tree, nil
 
