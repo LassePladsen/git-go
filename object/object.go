@@ -9,7 +9,9 @@ import (
 	"mygit/file"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
+	"strings"
 )
 
 // Object kind enum
@@ -152,7 +154,7 @@ func ReadTree(treeObj *Object, openEntryObjects bool) (*Tree, error) {
 	// Loop entries until rest data is empty
 	rest := treeObj.Contents
 	for len(rest) > 0 {
-		entry := TreeEntry{}
+		var entry TreeEntry
 
 		// Read mode
 		var i int
@@ -200,4 +202,59 @@ func ReadTree(treeObj *Object, openEntryObjects bool) (*Tree, error) {
 	}
 	return &tree, nil
 
+}
+
+// Write tree object recursively for the given dir path
+func WriteTree(path string) (*Object, error) {
+	files, err := os.ReadDir(path)
+	if err != nil {
+		return nil, fmt.Errorf("Could not read working directory: %v\n", err)
+	}
+
+	// Iterate over files in cwd, create blobs for files and trees for dirs
+	// TODO: this loop
+	type tmpEntry struct {
+		obj *Object
+		name string
+	}
+	// entries := make([]*tmpEntry, len(files))
+	var entries []tmpEntry
+	// for i, dirEntry := range files {
+	for _, dirEntry := range files {
+		// TODO: implement gitignore
+		if dirEntry.IsDir() {
+			continue // TODO: dirs
+		} else { // file
+			data, err := file.ReadFile(filepath.Join(path, dirEntry.Name()))
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Could not read file in working directory to write tree: %v\n", err)
+				os.Exit(1)
+			}
+			entryObj, err := Write(data, KindBlob)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Could not write data for file '%v' to blob for write tree: %v\n", dirEntry.Name(), err)
+				os.Exit(1)
+			}
+			// entries[i] = &tmpEntry{obj: entryObj, name: dirEntry.Name()}
+			entries = append(entries, tmpEntry{obj: entryObj, name: dirEntry.Name()})
+		}
+	}
+	for _, entry := range entries {
+		fmt.Println("LP entry: ", entry.name)
+	}
+	fmt.Println()
+
+	// // List out entry by alphabetical NAME (not hash)
+	// slices.SortFunc(entries, func(a, b *tmpEntry) int {
+	// 	if a == nil || b == nil {return 0}
+	// 	return strings.Compare(filepath.Base(a.obj.Path), filepath.Base(b.obj.Path))
+	// })
+	for _, entry := range entries {
+		fmt.Println("LP entry: ", entry.name)
+	}
+	slices.SortFunc(entries, func(a, b tmpEntry) int {
+		return strings.Compare(a.name, b.name)
+	})
+
+	return &Object{}, nil
 }
