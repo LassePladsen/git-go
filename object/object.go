@@ -20,6 +20,11 @@ const (
 	KindTree Kind = "tree"
 )
 
+var Kinds = map[string]Kind{
+	"blob": KindBlob,
+	"tree": KindTree,
+}
+
 type Object struct {
 	Hash     string
 	Kind     Kind
@@ -44,6 +49,7 @@ func Open(hash string) (*Object, error) {
 
 	// Header: <object_kind> <size>\0
 	// Read object kind up to a space
+	obj := Object{Hash: hash}
 	var buf []byte
 	var i int
 	var b byte
@@ -54,15 +60,11 @@ func Open(hash string) (*Object, error) {
 		buf = append(buf, b)
 	}
 
-	obj := Object{Hash: hash}
-	switch kind := Kind(buf); kind {
-	case "blob":
-		obj.Kind = KindBlob
-	case "tree":
-		obj.Kind = KindTree
-	default:
-		return nil, fmt.Errorf("Unsupported kind %v", kind)
+	kind, ok := Kinds[string(buf)]
+	if !ok {
+		return nil, fmt.Errorf("Unsupported kind: %v", string(buf))
 	}
+	obj.Kind = kind
 
 	// Read size up to null byte
 	buf = buf[:0]
