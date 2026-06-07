@@ -17,6 +17,7 @@ var commands = map[string]Command{
 	"cat-file":    catFile,
 	"hash-object": hashObject,
 	"ls-tree":     lsTree,
+	"write-tree":  writeTree,
 }
 
 func initGit(_ []string) (output []byte) {
@@ -58,7 +59,7 @@ func catFile(args []string) []byte {
 		os.Exit(0)
 	}
 	if len(hash) < 3 {
-		fmt.Fprintf(os.Stderr, "Not a valid object name: %v", hash)
+		fmt.Fprintf(os.Stderr, "Not a valid object name: %v\n", hash)
 		os.Exit(1)
 	}
 	obj, err := object.Open(hash)
@@ -130,13 +131,13 @@ func lsTree(args []string) []byte {
 		os.Exit(0)
 	}
 	if len(hash) < 3 {
-		fmt.Fprintf(os.Stderr, "Not a valid object name: %v", hash)
+		fmt.Fprintf(os.Stderr, "Not a valid object name: %v\n", hash)
 		os.Exit(1)
 	}
 
 	obj, err := object.Open(hash)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Could not read object: %v", err)
+		fmt.Fprintf(os.Stderr, "Could not read object: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -167,4 +168,38 @@ func lsTree(args []string) []byte {
 	}
 
 	return fmt.Appendln(out)
+}
+
+// Create a tree object from current state of "staging area" (from git add)
+// For now, every file in the working dir are already staged. TODO: implement git add and staging area
+func writeTree(args []string) []byte {
+	var out []byte
+	files, err := os.ReadDir(".")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Could not read working directory: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Iterate over files in cwd, create blobs for files and trees for dirs
+	for _, dirEntry := range files {
+		// TODO: implement gitignore
+		if dirEntry.IsDir() {
+			continue // TODO: dirs
+		} else { // file
+			data, err := file.ReadFile(dirEntry.Name()) // dont need to create path cause we are in cwd
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Could not read file in working directory to write tree: %v\n", err)
+				os.Exit(1)
+			}
+			obj, err := object.Write(data)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Could not write data for file '%v' to blob for write tree: %v\n", dirEntry.Name(), err)
+				os.Exit(1)
+			}
+			fmt.Println("LP obj: ", obj)
+			os.Exit(0)
+		}
+	}
+
+	return out
 }

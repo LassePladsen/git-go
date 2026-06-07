@@ -35,6 +35,10 @@ type Object struct {
 	Contents []byte
 }
 
+func (o Object) String() string {
+	return fmt.Sprintf("%v (size %v): %v", o.Kind, o.Size, string(o.Contents))
+}
+
 // Creates file path from object hash. Example: 1eadkl351341k123jlk21WDad -> .git/objects/1e/adkl351341k123jlk21WDad
 func HashToPath(hash string) string {
 	dir := hash[0:2]
