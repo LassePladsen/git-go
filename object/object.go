@@ -6,6 +6,7 @@ import (
 	"crypto/sha1"
 	"errors"
 	"fmt"
+	"io"
 	"mygit/file"
 	"os"
 	"path/filepath"
@@ -214,7 +215,6 @@ func ParseTree(treeObj *RawObject) (*Tree, error) {
 
 }
 
-/*
 // serialize a Tree into tree payload bytes ready to WriteObject
 func EncodeTree(tree *Tree) ([]byte, error) {
 	return []byte{}, nil
@@ -229,8 +229,9 @@ func WriteTree(path string) (*RawObject, error) {
 	}
 
 	// Iterate over files in path, create blobs for files and trees for dirs
-	entries := make([]*TreeEntry, len(dirEntries))
+	entries := make([]TreeEntry, len(dirEntries))
 	for i, dirEntry := range dirEntries {
+		i = i // FIXME: delete
 		fmt.Println("LP dirEntry: ", dirEntry)
 		// TODO: implement mygitignore
 		if dirEntry.IsDir() {
@@ -260,11 +261,16 @@ func WriteTree(path string) (*RawObject, error) {
 			}
 
 			// Store entry for tree
-			mode := stat.Mode()
-			entries[i] = &TreeEntry{Name: []byte(dirEntry.Name()), Mode: mode}
+			mode, err := gitMode(stat.Mode())
+			if err != nil {
+				return nil, fmt.Errorf("Could not parse file mode to git mode for file '%v' to write tree: %w\n", dirEntry.Name(), err)
+			}
+			entries[i] = TreeEntry{Name: []byte(dirEntry.Name()), Mode: []byte(mode)}
 		}
 
 	}
+	fmt.Println("LP entries: ", entries)
+	os.Exit(1)
 
 	// // FIXME: delete this block
 	// for _, e := range entries {
@@ -272,15 +278,30 @@ func WriteTree(path string) (*RawObject, error) {
 	// 	fmt.Println("LP entry: ", e.name)
 	// }
 
-	tree := &Tree{
-		// Entries: ...,
-	}
+	tree := Tree{Entries: entries}
 
-	data, err := EncodeTree(tree)
+	data, err := EncodeTree(&tree)
+	data = data // FIXME: delete
 	if err != nil {
 		return nil, err
 	}
 
-	return WriteObject(KindTree, data)
+	// return WriteObject(KindTree, data)
+	return nil, nil
 }
-*/
+
+func gitMode(mode os.FileMode) (string, error) {
+	switch {
+	case mode.IsDir():
+		return "40000", nil
+	case mode&os.ModeSymlink != 0:
+		return "120000", nil
+	case mode.IsRegular():
+		if mode&0o111 != 0 {
+			return "100755", nil
+		}
+		return "100644", nil
+	default:
+		return "", fmt.Errorf("unsupported file mode: %v", mode)
+	}
+}

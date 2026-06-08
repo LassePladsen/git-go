@@ -18,7 +18,7 @@ var commands = map[string]Command{
 	"cat-file":    catFile,
 	"hash-object": hashObject,
 	"ls-tree":     lsTree,
-	// "write-tree":  writeTree,
+	"write-tree":  writeTree,
 }
 
 func initGit(_ []string) (output []byte) {
@@ -198,7 +198,6 @@ func lsTree(args []string) []byte {
 	return fmt.Appendln(out)
 }
 
-/*
 // Create a tree object from current state of "staging area" (from git add)
 // For now, every file in the working dir are already staged. TODO: implement git add and staging area
 func writeTree(args []string) []byte {
@@ -214,4 +213,3 @@ func writeTree(args []string) []byte {
 	}
 	return fmt.Appendln(nil, obj.Hash)
 }
-*/
