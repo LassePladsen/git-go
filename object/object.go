@@ -9,9 +9,7 @@ import (
 	"mygit/file"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
-	"strings"
 )
 
 // Object kind enum
@@ -206,21 +204,20 @@ func ReadTree(treeObj *Object, openEntryObjects bool) (*Tree, error) {
 
 // Write tree object recursively for the given dir path
 func WriteTree(path string) (*Object, error) {
-	files, err := os.ReadDir(path)
+	dirEntries, err := os.ReadDir(path) // entires are sorted by name, so we don't need to handle this ourselves
 	if err != nil {
 		return nil, fmt.Errorf("Could not read working directory: %v\n", err)
 	}
 
 	// Iterate over files in cwd, create blobs for files and trees for dirs
 	// TODO: this loop
-	type tmpEntry struct {
+	type entry struct {
 		obj *Object
 		name string
 	}
-	// entries := make([]*tmpEntry, len(files))
-	var entries []tmpEntry
-	// for i, dirEntry := range files {
-	for _, dirEntry := range files {
+	entries := make([]*entry, len(dirEntries))
+	for i, dirEntry := range dirEntries {
+		fmt.Println("LP dirEntry: ", dirEntry)
 		// TODO: implement mygitignore
 		if dirEntry.IsDir() {
 			continue // TODO: dirs
@@ -235,27 +232,17 @@ func WriteTree(path string) (*Object, error) {
 				fmt.Fprintf(os.Stderr, "Could not write data for file '%v' to blob for write tree: %v\n", dirEntry.Name(), err)
 				os.Exit(1)
 			}
-			// entries[i] = &tmpEntry{obj: entryObj, name: dirEntry.Name()}
-			entries = append(entries, tmpEntry{obj: entryObj, name: dirEntry.Name()})
+			entries[i] = &entry{obj: entryObj, name: dirEntry.Name()}
 		}
-	}
-	for _, entry := range entries {
-		fmt.Println("LP entry: ", entry.name)
-	}
-	fmt.Println()
 
-	// TODO: sorting doesnt work, figureout why. then revert to using make above
-	// // List out entry by alphabetical NAME (not hash)
-	// slices.SortFunc(entries, func(a, b *tmpEntry) int {
-	// 	if a == nil || b == nil {return 0}
-	// 	return strings.Compare(filepath.Base(a.obj.Path), filepath.Base(b.obj.Path))
-	// })
-	for _, entry := range entries {
-		fmt.Println("LP entry: ", entry.name)
 	}
-	slices.SortFunc(entries, func(a, b tmpEntry) int {
-		return strings.Compare(a.name, b.name)
-	})
+
+	// // FIXME: delete this block
+	// for _, e := range entries {
+	// 	if e == nil {continue}
+	// 	fmt.Println("LP entry: ", e.name)
+	// }
+
 
 	return &Object{}, nil
 }
