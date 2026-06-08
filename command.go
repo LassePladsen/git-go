@@ -62,7 +62,7 @@ func catFile(args []string) []byte {
 		fmt.Fprintf(os.Stderr, "Not a valid object name: %v\n", hash)
 		os.Exit(1)
 	}
-	obj, err := object.Open(hash)
+	obj, err := object.OpenObject(hash)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			fmt.Fprintf(os.Stderr, "Not a valid object name: %v\n", hash)
@@ -114,7 +114,7 @@ func hashObject(args []string) []byte {
 	}
 
 	// Write to object
-	obj, err := object.Create(data, kind)
+	obj, err := object.WriteObject(data, kind)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -150,7 +150,7 @@ func lsTree(args []string) []byte {
 		os.Exit(1)
 	}
 
-	obj, err := object.Open(hash)
+	obj, err := object.OpenObject(hash)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Could not read object: %v\n", err)
 		os.Exit(1)

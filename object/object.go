@@ -56,8 +56,8 @@ func HashToPath(hash string) string {
 	return fmt.Sprintf(".mygit/objects/%v/%v", dir, filename)
 }
 
-// Reads object to Object struct
-func Open(hash string) (*RawObject, error) {
+// Reads object to RawObject
+func OpenObject(hash string) (*RawObject, error) {
 	filePath := HashToPath(hash)
 	data, err := file.ReadCompressedFile(filePath)
 	if err != nil {
@@ -105,8 +105,8 @@ func Open(hash string) (*RawObject, error) {
 	return &obj, nil
 }
 
-// Compress data and write to object file, also returns the Object
-func Create(data []byte, kind Kind) (*RawObject, error) {
+// Compress data and write to object file, and return the RawObject
+func WriteObject(data []byte, kind Kind) (*RawObject, error) {
 	// Object format: <object_kind> <size>\0<data>
 	size := len(data)
 
@@ -195,7 +195,7 @@ func ReadTree(treeObj *RawObject, openEntryObjects bool) (*Tree, error) {
 
 		// Unless openEntryObjects, we need to open each object
 		if openEntryObjects {
-			entryObj, err := Open(fmt.Sprintf("%x", entry.Hash))
+			entryObj, err := OpenObject(fmt.Sprintf("%x", entry.Hash))
 			if err != nil {
 				return nil, fmt.Errorf("Could not open tree entry object '%x': %w", entry.Hash, err)
 			}
@@ -232,7 +232,7 @@ func WriteTree(path string) (*Tree, error) {
 				fmt.Fprintf(os.Stderr, "Could not read file in working directory to write tree: %v\n", err)
 				os.Exit(1)
 			}
-			entryObj, err := Create(data, KindBlob)
+			entryObj, err := WriteObject(data, KindBlob)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Could not write data for file '%v' to blob for write tree: %v\n", dirEntry.Name(), err)
 				os.Exit(1)
