@@ -28,6 +28,7 @@ func ParseKind(s string) (Kind, error) {
 	return "", fmt.Errorf("Unsupported kind: %v", s)
 }
 
+// represents a stored object file
 type RawObject struct {
 	Hash     string
 	Kind     Kind
@@ -137,7 +138,6 @@ func WriteObject(data []byte, kind Kind) (*RawObject, error) {
 }
 
 type Tree struct {
-	Obj     RawObject
 	Entries []TreeEntry
 }
 type TreeEntry struct {
@@ -153,7 +153,7 @@ func ReadTree(treeObj *RawObject, openEntryObjects bool) (*Tree, error) {
 		return nil, errors.New("Not a tree object")
 	}
 	// read format: <mode> <name>\0<20_byte_object_hash>
-	tree := Tree{Obj: *treeObj}
+	var tree Tree
 
 	// Loop entries until rest data is empty
 	rest := treeObj.Data
@@ -209,7 +209,7 @@ func ReadTree(treeObj *RawObject, openEntryObjects bool) (*Tree, error) {
 }
 
 // Write tree object recursively for the given dir path
-func WriteTree(path string) (*Tree, error) {
+func WriteTree(path string) (*RawObject, error) {
 	dirEntries, err := os.ReadDir(path) // entires are sorted by name, so we don't need to handle this ourselves
 	if err != nil {
 		return nil, fmt.Errorf("Could not read working directory: %v\n", err)
@@ -248,5 +248,5 @@ func WriteTree(path string) (*Tree, error) {
 	// 	fmt.Println("LP entry: ", e.name)
 	// }
 
-	return &Tree{}, nil
+	return &RawObject{}, nil
 }

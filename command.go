@@ -193,10 +193,10 @@ func writeTree(args []string) []byte {
 		fmt.Fprintf(os.Stderr, "Could not get cwd: %v\n", err)
 		os.Exit(1)
 	}
-	tree, err := object.WriteTree(cwd)
+	obj, err := object.WriteTree(cwd)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Could not write tree for working dir: %v\n", err)
 		os.Exit(1)
 	}
-	return fmt.Appendln(nil, tree.Obj.Hash)
+	return fmt.Appendln(nil, obj.Hash)
 }
