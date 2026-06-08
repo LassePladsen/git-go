@@ -9,15 +9,16 @@ import (
 	"mygit/file"
 	"os"
 	"path/filepath"
-	"strconv"
 )
 
 // RawObject kind enum
 type Kind string
 
 const (
-	KindBlob Kind = "blob"
-	KindTree Kind = "tree"
+	KindBlob   Kind = "blob"
+	KindTree   Kind = "tree"
+	KindCommit Kind = "commit"
+	KindTag    Kind = "tag"
 )
 
 func ParseKind(s string) (Kind, error) {
@@ -94,11 +95,11 @@ func OpenObject(hash string) (*RawObject, error) {
 		buf = append(buf, b)
 
 	}
-	size, err := strconv.Atoi(string(buf))
-	if err != nil {
-		return nil, err
-	}
-	fmt.Println("LP size: ", size) // TODO: do i need size? maybe use size in slice below just to use it?
+	// TODO: do i need size at all? maybe try to use it in slice below..?
+	// _, err = strconv.Atoi(string(buf))
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	// The rest is the actual object data, we are done with header after null byte
 	// we don't actually need the size since i've loaded the entire data into a slice
@@ -141,6 +142,7 @@ type Tree struct {
 	Entries []TreeEntry
 }
 type TreeEntry struct {
+	// Permissions mode. NB: Directory mode 040000 is stored as 40000
 	Mode []byte
 	Name []byte
 	Hash []byte
@@ -148,11 +150,12 @@ type TreeEntry struct {
 
 func (e TreeEntry) Kind() (kind Kind, err error) {
 	switch mode := string(e.Mode); mode {
-	case "040000":
+	case "40000":
 		kind = KindTree
 	case "100644", "100755", "120000":
 		kind = KindBlob
-	// case: "160000": commit
+	case "160000":
+		kind = KindCommit
 	default:
 		err = fmt.Errorf("TreeEntry has unsupported mode: %v", mode)
 	}
@@ -172,7 +175,6 @@ func ParseTree(treeObj *RawObject) (*Tree, error) {
 	for len(rest) > 0 {
 		var entry TreeEntry
 
-		// Read mode
 		var i int
 		for i = range rest {
 			b := rest[i]
@@ -184,6 +186,7 @@ func ParseTree(treeObj *RawObject) (*Tree, error) {
 		if i >= len(rest) || rest[i] != ' ' {
 			return nil, errors.New("Malformed tree entry mode")
 		}
+
 		rest = rest[i+1:] // skip space
 
 		// Read name
@@ -211,36 +214,54 @@ func ParseTree(treeObj *RawObject) (*Tree, error) {
 
 }
 
-// Write tree object recursively for the given dir path
+/*
+// serialize a Tree into tree payload bytes ready to WriteObject
+func EncodeTree(tree *Tree) ([]byte, error) {
+	return []byte{}, nil
+}
+
+// TODO:
+// Walks directory path recursively, writes RawObjects for each entry, and finally writes the root Tree object
 func WriteTree(path string) (*RawObject, error) {
 	dirEntries, err := os.ReadDir(path) // entires are sorted by name, so we don't need to handle this ourselves
 	if err != nil {
 		return nil, fmt.Errorf("Could not read working directory: %v\n", err)
 	}
 
-	// Iterate over files in cwd, create blobs for files and trees for dirs
-	type entry struct {
-		obj  *RawObject
-		name string
-	}
-	entries := make([]*entry, len(dirEntries))
+	// Iterate over files in path, create blobs for files and trees for dirs
+	entries := make([]*TreeEntry, len(dirEntries))
 	for i, dirEntry := range dirEntries {
 		fmt.Println("LP dirEntry: ", dirEntry)
 		// TODO: implement mygitignore
 		if dirEntry.IsDir() {
 			continue // TODO: dirs
 		} else { // file
-			data, err := file.ReadFile(filepath.Join(path, dirEntry.Name()))
+			// open file and read
+			filePath := filepath.Join(path, dirEntry.Name())
+			file, err := os.Open(filePath)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Could not read file in working directory to write tree: %v\n", err)
-				os.Exit(1)
+				return nil, fmt.Errorf("Could not open file '%v' in to write tree: %w\n", dirEntry.Name(), err)
 			}
-			entryObj, err := WriteObject(data, KindBlob)
+			defer file.Close()
+
+			data, err := io.ReadAll(file)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Could not write data for file '%v' to blob for write tree: %v\n", dirEntry.Name(), err)
-				os.Exit(1)
+				return nil, fmt.Errorf("Could not read file '%v' in to write tree: %w\n", dirEntry.Name(), err)
 			}
-			entries[i] = &entry{obj: entryObj, name: dirEntry.Name()}
+
+			// Write object
+			_, err = WriteObject(data, KindBlob)
+			if err != nil {
+				return nil, fmt.Errorf("Could not write object for file '%v' to write tree: %w\n", dirEntry.Name(), err)
+			}
+			stat, err := file.Stat()
+			if err != nil {
+				return nil, fmt.Errorf("Could not stat file '%v' to write tree: %w\n", dirEntry.Name(), err)
+			}
+
+			// Store entry for tree
+			mode := stat.Mode()
+			entries[i] = &TreeEntry{Name: []byte(dirEntry.Name()), Mode: mode}
 		}
 
 	}
@@ -251,5 +272,15 @@ func WriteTree(path string) (*RawObject, error) {
 	// 	fmt.Println("LP entry: ", e.name)
 	// }
 
-	return &RawObject{}, nil
+	tree := &Tree{
+		// Entries: ...,
+	}
+
+	data, err := EncodeTree(tree)
+	if err != nil {
+		return nil, err
+	}
+
+	return WriteObject(KindTree, data)
 }
+*/

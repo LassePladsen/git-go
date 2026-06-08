@@ -8,6 +8,7 @@ import (
 	"mygit/file"
 	"mygit/object"
 	"os"
+	"slices"
 )
 
 type Command = func(args []string) []byte
@@ -17,7 +18,7 @@ var commands = map[string]Command{
 	"cat-file":    catFile,
 	"hash-object": hashObject,
 	"ls-tree":     lsTree,
-	"write-tree":  writeTree,
+	// "write-tree":  writeTree,
 }
 
 func initGit(_ []string) (output []byte) {
@@ -177,6 +178,12 @@ func lsTree(args []string) []byte {
 				fmt.Fprintf(os.Stderr, "Could not get tree entry kind: %v", err)
 				os.Exit(1)
 			}
+
+			// dir mode 040000 is stored as 40000, so prepend the zero
+			if string(entry.Mode) == "40000" {
+				entry.Mode = slices.Insert(entry.Mode, 0, '0')
+			}
+
 			out = append(out, entry.Mode...)
 			out = append(out, ' ')
 			out = append(out, []byte(kind)...)
@@ -184,12 +191,14 @@ func lsTree(args []string) []byte {
 			out = append(out, hash...)
 			out = append(out, []byte("    ")...)
 			out = append(out, entry.Name...)
+			out = fmt.Appendln(out)
 		}
 	}
 
 	return fmt.Appendln(out)
 }
 
+/*
 // Create a tree object from current state of "staging area" (from git add)
 // For now, every file in the working dir are already staged. TODO: implement git add and staging area
 func writeTree(args []string) []byte {
@@ -205,3 +214,4 @@ func writeTree(args []string) []byte {
 	}
 	return fmt.Appendln(nil, obj.Hash)
 }
+*/
