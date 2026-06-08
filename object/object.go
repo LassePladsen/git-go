@@ -140,7 +140,7 @@ func WriteObject(data []byte, kind Kind) (*RawObject, error) {
 }
 
 type Tree struct {
-	Entries []TreeEntry
+	Entries []*TreeEntry
 }
 type TreeEntry struct {
 	// Permissions mode. NB: Directory mode 040000 is stored as 40000
@@ -209,7 +209,7 @@ func ParseTree(treeObj *RawObject) (*Tree, error) {
 		}
 		entry.Hash, rest = rest[:20], rest[20:]
 
-		tree.Entries = append(tree.Entries, entry)
+		tree.Entries = append(tree.Entries, &entry)
 	}
 	return &tree, nil
 
@@ -217,10 +217,10 @@ func ParseTree(treeObj *RawObject) (*Tree, error) {
 
 // serialize a Tree into tree payload bytes ready to WriteObject
 func EncodeTree(tree *Tree) ([]byte, error) {
+	// TODO: 
 	return []byte{}, nil
 }
 
-// TODO:
 // Walks directory path recursively, writes RawObjects for each entry, and finally writes the root Tree object
 func WriteTree(path string) (*RawObject, error) {
 	dirEntries, err := os.ReadDir(path) // entires are sorted by name, so we don't need to handle this ourselves
@@ -229,17 +229,20 @@ func WriteTree(path string) (*RawObject, error) {
 	}
 
 	// Iterate over files in path, create blobs for files and trees for dirs
-	entries := make([]TreeEntry, len(dirEntries))
+	entries := make([]*TreeEntry, len(dirEntries))
 	for i, dirEntry := range dirEntries {
-		i = i // FIXME: delete
-		fmt.Println("LP dirEntry: ", dirEntry)
+		entryPath := filepath.Join(path, dirEntry.Name())
+		fmt.Println("LP entryPath: ", entryPath)
 		// TODO: implement mygitignore
 		if dirEntry.IsDir() {
-			continue // TODO: dirs
+			obj, err := WriteTree(entryPath)
+			if err != nil {
+				return nil, err
+			}
+			entries[i] = &TreeEntry{Hash: []byte(obj.Hash), Mode: []byte("40000"), Name: []byte(dirEntry.Name())}
 		} else { // file
 			// open file and read
-			filePath := filepath.Join(path, dirEntry.Name())
-			file, err := os.Open(filePath)
+			file, err := os.Open(entryPath)
 			if err != nil {
 				return nil, fmt.Errorf("Could not open file '%v' in to write tree: %w\n", dirEntry.Name(), err)
 			}
@@ -255,42 +258,35 @@ func WriteTree(path string) (*RawObject, error) {
 			if err != nil {
 				return nil, fmt.Errorf("Could not write object for file '%v' to write tree: %w\n", dirEntry.Name(), err)
 			}
-			stat, err := file.Stat()
-			if err != nil {
-				return nil, fmt.Errorf("Could not stat file '%v' to write tree: %w\n", dirEntry.Name(), err)
-			}
 
 			// Store entry for tree
-			mode, err := gitMode(stat.Mode())
+			mode, err := ParseFileMode(file)
 			if err != nil {
 				return nil, fmt.Errorf("Could not parse file mode to git mode for file '%v' to write tree: %w\n", dirEntry.Name(), err)
 			}
-			entries[i] = TreeEntry{Name: []byte(dirEntry.Name()), Mode: []byte(mode)}
+			entries[i] = &TreeEntry{Name: []byte(dirEntry.Name()), Mode: []byte(mode)}
 		}
 
 	}
-	fmt.Println("LP entries: ", entries)
-	os.Exit(1)
-
-	// // FIXME: delete this block
-	// for _, e := range entries {
-	// 	if e == nil {continue}
-	// 	fmt.Println("LP entry: ", e.name)
-	// }
+	fmt.Println("LP entries: ", entries) // FIXME: delete
 
 	tree := Tree{Entries: entries}
 
 	data, err := EncodeTree(&tree)
-	data = data // FIXME: delete
 	if err != nil {
 		return nil, err
 	}
 
-	// return WriteObject(KindTree, data)
-	return nil, nil
+	return WriteObject(data, KindTree)
 }
 
-func gitMode(mode os.FileMode) (string, error) {
+// File mode to git mode, e.g "40000" for dirs
+func ParseFileMode(f *os.File) (string, error) {
+	stat, err := f.Stat()
+	if err != nil {
+		return "", fmt.Errorf("Could not stat file '%v' to parse mode: %w\n", f.Name(), err)
+	}
+	mode := stat.Mode()
 	switch {
 	case mode.IsDir():
 		return "40000", nil
