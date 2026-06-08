@@ -37,7 +37,8 @@ type Object struct {
 }
 
 func (o Object) String() string {
-	return fmt.Sprintf("Object{\n\tPath: %v\n\tHash:% v\n\tKind: %v\n\tSize: %v\n\tContents: %v\n}", o.Path, o.Hash, o.Kind, o.Size, string(o.Contents))
+	return fmt.Sprintf("Object{\n\tPath: %v\n\tHash:% v\n\tKind: %v\n\tSize: %v\n\tContents: %v\n}",
+		o.Path, o.Hash, o.Kind, o.Size, string(o.Contents))
 }
 
 // Creates file path from object hash. Example: 1eadkl351341k123jlk21WDad -> .mygit/objects/1e/adkl351341k123jlk21WDad
@@ -97,11 +98,9 @@ func Open(hash string) (*Object, error) {
 }
 
 // Compress data and write to object file, also returns the Object
-func Write(data []byte, kind Kind) (*Object, error) {
+func Create(data []byte, kind Kind) (*Object, error) {
 	// Object format: <object_kind> <size>\0<data>
 	size := len(data)
-
-	// TODO: for tree kind, need to follow dir recursively and write all objects...
 
 	objData := fmt.Appendf(nil, "%v %v\x00%v", kind, size, string(data))
 	sum := sha1.Sum(objData)
@@ -203,16 +202,15 @@ func ReadTree(treeObj *Object, openEntryObjects bool) (*Tree, error) {
 }
 
 // Write tree object recursively for the given dir path
-func WriteTree(path string) (*Object, error) {
+func WriteTree(path string) (*Tree, error) {
 	dirEntries, err := os.ReadDir(path) // entires are sorted by name, so we don't need to handle this ourselves
 	if err != nil {
 		return nil, fmt.Errorf("Could not read working directory: %v\n", err)
 	}
 
 	// Iterate over files in cwd, create blobs for files and trees for dirs
-	// TODO: this loop
 	type entry struct {
-		obj *Object
+		obj  *Object
 		name string
 	}
 	entries := make([]*entry, len(dirEntries))
@@ -227,7 +225,7 @@ func WriteTree(path string) (*Object, error) {
 				fmt.Fprintf(os.Stderr, "Could not read file in working directory to write tree: %v\n", err)
 				os.Exit(1)
 			}
-			entryObj, err := Write(data, KindBlob)
+			entryObj, err := Create(data, KindBlob)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Could not write data for file '%v' to blob for write tree: %v\n", dirEntry.Name(), err)
 				os.Exit(1)
@@ -243,6 +241,5 @@ func WriteTree(path string) (*Object, error) {
 	// 	fmt.Println("LP entry: ", e.name)
 	// }
 
-
-	return &Object{}, nil
+	return &Tree{}, nil
 }

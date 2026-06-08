@@ -114,7 +114,7 @@ func hashObject(args []string) []byte {
 	}
 
 	// Write to object
-	obj, err := object.Write(data, kind)
+	obj, err := object.Create(data, kind)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -193,10 +193,10 @@ func writeTree(args []string) []byte {
 		fmt.Fprintf(os.Stderr, "Could not get cwd: %v\n", err)
 		os.Exit(1)
 	}
-	obj, err := object.WriteTree(cwd)
+	tree, err := object.WriteTree(cwd)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Could not write tree for working dir: %v\n", err)
 		os.Exit(1)
 	}
-	return fmt.Appendln(nil, obj.Hash)
+	return fmt.Appendln(nil, tree.Obj.Hash)
 }
