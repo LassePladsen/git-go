@@ -29,16 +29,24 @@ func ParseKind(s string) (Kind, error) {
 }
 
 type Object struct {
-	Path     string
 	Hash     string
 	Kind     Kind
-	Size     uint
 	Contents []byte
 }
 
 func (o Object) String() string {
 	return fmt.Sprintf("Object{\n\tPath: %v\n\tHash:% v\n\tKind: %v\n\tSize: %v\n\tContents: %v\n}",
-		o.Path, o.Hash, o.Kind, o.Size, string(o.Contents))
+		o.Path(), o.Hash, o.Kind, o.Size(), string(o.Contents))
+}
+
+// Size of data
+func (o Object) Size() int {
+	return len(o.Contents)
+}
+
+// File path to object
+func (o Object) Path() string {
+	return HashToPath(o.Hash)
 }
 
 // Creates file path from object hash. Example: 1eadkl351341k123jlk21WDad -> .mygit/objects/1e/adkl351341k123jlk21WDad
@@ -58,7 +66,7 @@ func Open(hash string) (*Object, error) {
 
 	// Header: <object_kind> <size>\0
 	// Read object kind up to a space
-	obj := Object{Hash: hash, Path: filePath}
+	obj := Object{Hash: hash}
 	var buf []byte
 	var i int
 	var b byte
@@ -89,7 +97,7 @@ func Open(hash string) (*Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	obj.Size = uint(size)
+	fmt.Println("LP size: ", size) // TODO: do i need size? maybe use size in slice below just to use it?
 
 	// The rest is the actual object contents, we are done with header after null byte
 	// we don't actually need the size since i've loaded the entire data into a slice
@@ -105,7 +113,7 @@ func Create(data []byte, kind Kind) (*Object, error) {
 	objData := fmt.Appendf(nil, "%v %v\x00%v", kind, size, string(data))
 	sum := sha1.Sum(objData)
 	hash := fmt.Sprintf("%x", sum)
-	obj := Object{Kind: kind, Size: uint(size), Contents: data, Hash: hash}
+	obj := Object{Kind: kind, Contents: data, Hash: hash}
 
 	// Compress data and write to file
 	var buf bytes.Buffer
@@ -116,7 +124,6 @@ func Create(data []byte, kind Kind) (*Object, error) {
 	zw.Close()
 
 	path := HashToPath(hash)
-	obj.Path = path
 	dir := filepath.Dir(path)
 	if !file.Exists(dir) {
 		if err := os.Mkdir(dir, 0775); err != nil {
