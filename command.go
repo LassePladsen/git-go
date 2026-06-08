@@ -156,7 +156,7 @@ func lsTree(args []string) []byte {
 		os.Exit(1)
 	}
 
-	tree, err := object.ReadTree(obj, !nameOnly)
+	tree, err := object.ReadTree(obj)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -172,9 +172,14 @@ func lsTree(args []string) []byte {
 			hash := make([]byte, hex.EncodedLen(len(entry.Hash)))
 			hex.Encode(hash, entry.Hash)
 
+			kind, err := entry.Kind()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Could not get tree entry kind: %v", err)
+				os.Exit(1)
+			}
 			out = append(out, entry.Mode...)
 			out = append(out, ' ')
-			out = append(out, entry.Object.Kind...)
+			out = append(out, []byte(kind)...)
 			out = append(out, ' ')
 			out = append(out, hash...)
 			out = append(out, []byte("    ")...)

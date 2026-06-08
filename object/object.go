@@ -30,8 +30,8 @@ func ParseKind(s string) (Kind, error) {
 
 // represents a stored object file
 type RawObject struct {
-	Hash     string
-	Kind     Kind
+	Hash string
+	Kind Kind
 	Data []byte
 }
 
@@ -141,14 +141,26 @@ type Tree struct {
 	Entries []TreeEntry
 }
 type TreeEntry struct {
-	Mode   []byte
-	Name   []byte
-	Hash   []byte
-	Object *RawObject
+	Mode []byte
+	Name []byte
+	Hash []byte
+}
+
+func (e TreeEntry) Kind() (kind Kind, err error) {
+	switch mode := string(e.Mode); mode {
+	case "040000":
+		kind = KindTree
+	case "100644", "100755", "120000":
+		kind = KindBlob
+	// case: "160000": commit
+	default:
+		err = fmt.Errorf("TreeEntry has unsupported mode: %v", mode)
+	}
+	return
 }
 
 // Parse tree entries. if openEntryObjects then each entry object is opened and read into TreeEntry.Object
-func ReadTree(treeObj *RawObject, openEntryObjects bool) (*Tree, error) {
+func ReadTree(treeObj *RawObject) (*Tree, error) {
 	if treeObj.Kind != KindTree {
 		return nil, errors.New("Not a tree object")
 	}
@@ -192,15 +204,6 @@ func ReadTree(treeObj *RawObject, openEntryObjects bool) (*Tree, error) {
 			return nil, errors.New("Malformed tree entry hash")
 		}
 		entry.Hash, rest = rest[:20], rest[20:]
-
-		// Unless openEntryObjects, we need to open each object
-		if openEntryObjects {
-			entryObj, err := OpenObject(fmt.Sprintf("%x", entry.Hash))
-			if err != nil {
-				return nil, fmt.Errorf("Could not open tree entry object '%x': %w", entry.Hash, err)
-			}
-			entry.Object = entryObj
-		}
 
 		tree.Entries = append(tree.Entries, entry)
 	}
