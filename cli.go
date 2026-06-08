@@ -156,7 +156,7 @@ func lsTree(args []string) []byte {
 		os.Exit(1)
 	}
 
-	tree, err := object.ReadTree(obj)
+	tree, err := object.ParseTree(obj)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

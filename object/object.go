@@ -160,7 +160,7 @@ func (e TreeEntry) Kind() (kind Kind, err error) {
 }
 
 // Parse tree entries. if openEntryObjects then each entry object is opened and read into TreeEntry.Object
-func ReadTree(treeObj *RawObject) (*Tree, error) {
+func ParseTree(treeObj *RawObject) (*Tree, error) {
 	if treeObj.Kind != KindTree {
 		return nil, errors.New("Not a tree object")
 	}
