@@ -12,7 +12,7 @@ import (
 	"strconv"
 )
 
-// Object kind enum
+// RawObject kind enum
 type Kind string
 
 const (
@@ -28,24 +28,24 @@ func ParseKind(s string) (Kind, error) {
 	return "", fmt.Errorf("Unsupported kind: %v", s)
 }
 
-type Object struct {
+type RawObject struct {
 	Hash     string
 	Kind     Kind
-	Contents []byte
+	Data []byte
 }
 
-func (o Object) String() string {
-	return fmt.Sprintf("Object{\n\tPath: %v\n\tHash:% v\n\tKind: %v\n\tSize: %v\n\tContents: %v\n}",
-		o.Path(), o.Hash, o.Kind, o.Size(), string(o.Contents))
+func (o RawObject) String() string {
+	return fmt.Sprintf("RawObject{\n\tPath: %v\n\tHash:% v\n\tKind: %v\n\tSize: %v\n\tData: %v\n}",
+		o.Path(), o.Hash, o.Kind, o.Size(), string(o.Data))
 }
 
 // Size of data
-func (o Object) Size() int {
-	return len(o.Contents)
+func (o RawObject) Size() int {
+	return len(o.Data)
 }
 
 // File path to object
-func (o Object) Path() string {
+func (o RawObject) Path() string {
 	return HashToPath(o.Hash)
 }
 
@@ -57,7 +57,7 @@ func HashToPath(hash string) string {
 }
 
 // Reads object to Object struct
-func Open(hash string) (*Object, error) {
+func Open(hash string) (*RawObject, error) {
 	filePath := HashToPath(hash)
 	data, err := file.ReadCompressedFile(filePath)
 	if err != nil {
@@ -66,7 +66,7 @@ func Open(hash string) (*Object, error) {
 
 	// Header: <object_kind> <size>\0
 	// Read object kind up to a space
-	obj := Object{Hash: hash}
+	obj := RawObject{Hash: hash}
 	var buf []byte
 	var i int
 	var b byte
@@ -99,21 +99,21 @@ func Open(hash string) (*Object, error) {
 	}
 	fmt.Println("LP size: ", size) // TODO: do i need size? maybe use size in slice below just to use it?
 
-	// The rest is the actual object contents, we are done with header after null byte
+	// The rest is the actual object data, we are done with header after null byte
 	// we don't actually need the size since i've loaded the entire data into a slice
-	obj.Contents = rest[i+1:]
+	obj.Data = rest[i+1:]
 	return &obj, nil
 }
 
 // Compress data and write to object file, also returns the Object
-func Create(data []byte, kind Kind) (*Object, error) {
+func Create(data []byte, kind Kind) (*RawObject, error) {
 	// Object format: <object_kind> <size>\0<data>
 	size := len(data)
 
 	objData := fmt.Appendf(nil, "%v %v\x00%v", kind, size, string(data))
 	sum := sha1.Sum(objData)
 	hash := fmt.Sprintf("%x", sum)
-	obj := Object{Kind: kind, Contents: data, Hash: hash}
+	obj := RawObject{Kind: kind, Data: data, Hash: hash}
 
 	// Compress data and write to file
 	var buf bytes.Buffer
@@ -137,18 +137,18 @@ func Create(data []byte, kind Kind) (*Object, error) {
 }
 
 type Tree struct {
-	Obj     Object
+	Obj     RawObject
 	Entries []TreeEntry
 }
 type TreeEntry struct {
 	Mode   []byte
 	Name   []byte
 	Hash   []byte
-	Object *Object
+	Object *RawObject
 }
 
 // Parse tree entries. if openEntryObjects then each entry object is opened and read into TreeEntry.Object
-func ReadTree(treeObj *Object, openEntryObjects bool) (*Tree, error) {
+func ReadTree(treeObj *RawObject, openEntryObjects bool) (*Tree, error) {
 	if treeObj.Kind != KindTree {
 		return nil, errors.New("Not a tree object")
 	}
@@ -156,7 +156,7 @@ func ReadTree(treeObj *Object, openEntryObjects bool) (*Tree, error) {
 	tree := Tree{Obj: *treeObj}
 
 	// Loop entries until rest data is empty
-	rest := treeObj.Contents
+	rest := treeObj.Data
 	for len(rest) > 0 {
 		var entry TreeEntry
 
@@ -217,7 +217,7 @@ func WriteTree(path string) (*Tree, error) {
 
 	// Iterate over files in cwd, create blobs for files and trees for dirs
 	type entry struct {
-		obj  *Object
+		obj  *RawObject
 		name string
 	}
 	entries := make([]*entry, len(dirEntries))

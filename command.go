@@ -41,7 +41,7 @@ func initGit(_ []string) (output []byte) {
 	return
 }
 
-// return object contents
+// return object data
 func catFile(args []string) []byte {
 	helpMsg := "usage: mygit cat-file <object_hash>"
 	// Get blob hash from positional arg
@@ -71,7 +71,7 @@ func catFile(args []string) []byte {
 		}
 		os.Exit(1)
 	}
-	return obj.Contents
+	return obj.Data
 }
 
 // Hash file to object
