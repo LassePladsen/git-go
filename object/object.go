@@ -42,11 +42,11 @@ func (o Object) String() string {
 	return fmt.Sprintf("Object{\n\tPath: %v\n\tHash:% v\n\tKind: %v\n\tSize: %v\n\tContents: %v\n}", o.Path, o.Hash, o.Kind, o.Size, string(o.Contents))
 }
 
-// Creates file path from object hash. Example: 1eadkl351341k123jlk21WDad -> .git/objects/1e/adkl351341k123jlk21WDad
+// Creates file path from object hash. Example: 1eadkl351341k123jlk21WDad -> .mygit/objects/1e/adkl351341k123jlk21WDad
 func HashToPath(hash string) string {
 	dir := hash[0:2]
 	filename := hash[2:]
-	return fmt.Sprintf(".git/objects/%v/%v", dir, filename)
+	return fmt.Sprintf(".mygit/objects/%v/%v", dir, filename)
 }
 
 // Reads object to Object struct
@@ -221,7 +221,7 @@ func WriteTree(path string) (*Object, error) {
 	var entries []tmpEntry
 	// for i, dirEntry := range files {
 	for _, dirEntry := range files {
-		// TODO: implement gitignore
+		// TODO: implement mygitignore
 		if dirEntry.IsDir() {
 			continue // TODO: dirs
 		} else { // file

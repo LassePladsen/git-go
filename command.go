@@ -21,23 +21,23 @@ var commands = map[string]Command{
 }
 
 func initGit(_ []string) (output []byte) {
-	if err := os.Mkdir(".git", 0775); err != nil {
-		fmt.Fprintln(os.Stderr, "Could not mkdir for .git")
+	if err := os.Mkdir(".mygit", 0775); err != nil {
+		fmt.Fprintln(os.Stderr, "Could not mkdir for .mygit")
 		os.Exit(1)
 	}
-	if err := os.Mkdir(".git/objects", 0775); err != nil {
-		fmt.Fprintln(os.Stderr, "Could not mkdir: .git/objects")
+	if err := os.Mkdir(".mygit/objects", 0775); err != nil {
+		fmt.Fprintln(os.Stderr, "Could not mkdir: .mygit/objects")
 		os.Exit(1)
 	}
-	if err := os.Mkdir(".git/refs", 0775); err != nil {
-		fmt.Fprintln(os.Stderr, "Could not mkdir: .git/refs")
+	if err := os.Mkdir(".mygit/refs", 0775); err != nil {
+		fmt.Fprintln(os.Stderr, "Could not mkdir: .mygit/refs")
 		os.Exit(1)
 	}
-	if err := os.WriteFile(".git/HEAD", []byte("ref: refs/heads/main\n"), 0664); err != nil {
-		fmt.Fprintln(os.Stderr, "Could not write to file: .git/HEAD")
+	if err := os.WriteFile(".mygit/HEAD", []byte("ref: refs/heads/main\n"), 0664); err != nil {
+		fmt.Fprintln(os.Stderr, "Could not write to file: .mygit/HEAD")
 		os.Exit(1)
 	}
-	output = []byte("Initialized git directory")
+	output = []byte("Initialized mygit directory")
 	return
 }
 
