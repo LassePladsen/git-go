@@ -144,9 +144,9 @@ type Tree struct {
 }
 type TreeEntry struct {
 	// Permissions mode. NB: Directory mode 040000 is stored as 40000
-	Mode []byte
-	Name []byte
-	Hash []byte
+	Mode string
+	Name string
+	Hash string
 }
 
 func (e TreeEntry) Kind() (kind Kind, err error) {
@@ -177,39 +177,45 @@ func ParseTree(treeObj *RawObject) (*Tree, error) {
 		var entry TreeEntry
 
 		var i int
+		var mode []byte
 		for i = range rest {
 			b := rest[i]
 			if b == ' ' {
 				break
 			}
-			entry.Mode = append(entry.Mode, b)
+			mode = append(mode, b)
 		}
 		if i >= len(rest) || rest[i] != ' ' {
 			return nil, errors.New("Malformed tree entry mode")
 		}
+		entry.Mode = string(mode)
 
 		rest = rest[i+1:] // skip space
 
 		// Read name
+		var name []byte
 		for i = range rest {
 			b := rest[i]
 			if b == 0 {
 				break
 			}
-			entry.Name = append(entry.Name, b)
+			name = append(name, b)
 		}
 		if i >= len(rest) || rest[i] != 0 {
 			return nil, errors.New("Malformed tree entry name")
 		}
+		entry.Name = string(name)
+
 		rest = rest[i+1:] // skip null byte
 
 		// Read 20 byte hash (its not stored as hex)
 		if len(rest) < 20 {
 			return nil, errors.New("Malformed tree entry hash")
 		}
-		entry.Hash, rest = rest[:20], rest[20:]
-
+		entry.Hash = string(rest[:20])
 		tree.Entries = append(tree.Entries, &entry)
+
+		rest = rest[20:]
 	}
 	return &tree, nil
 
@@ -217,7 +223,12 @@ func ParseTree(treeObj *RawObject) (*Tree, error) {
 
 // serialize a Tree into tree payload bytes ready to WriteObject
 func EncodeTree(tree *Tree) ([]byte, error) {
-	// TODO: 
+	for _, entry := range tree.Entries {
+		fmt.Println("LP entry: ", entry)
+
+	}
+	os.Exit(0)
+	// TODO:
 	return []byte{}, nil
 }
 
@@ -239,7 +250,7 @@ func WriteTree(path string) (*RawObject, error) {
 			if err != nil {
 				return nil, err
 			}
-			entries[i] = &TreeEntry{Hash: []byte(obj.Hash), Mode: []byte("40000"), Name: []byte(dirEntry.Name())}
+			entries[i] = &TreeEntry{Hash: obj.Hash, Mode: "40000", Name: dirEntry.Name()}
 		} else { // file
 			// open file and read
 			file, err := os.Open(entryPath)
@@ -254,7 +265,7 @@ func WriteTree(path string) (*RawObject, error) {
 			}
 
 			// Write object
-			_, err = WriteObject(data, KindBlob)
+			obj, err := WriteObject(data, KindBlob)
 			if err != nil {
 				return nil, fmt.Errorf("Could not write object for file '%v' to write tree: %w\n", dirEntry.Name(), err)
 			}
@@ -264,14 +275,12 @@ func WriteTree(path string) (*RawObject, error) {
 			if err != nil {
 				return nil, fmt.Errorf("Could not parse file mode to git mode for file '%v' to write tree: %w\n", dirEntry.Name(), err)
 			}
-			entries[i] = &TreeEntry{Name: []byte(dirEntry.Name()), Mode: []byte(mode)}
+			entries[i] = &TreeEntry{Name: dirEntry.Name(), Mode: mode, Hash: obj.Hash}
 		}
 
 	}
-	fmt.Println("LP entries: ", entries) // FIXME: delete
 
 	tree := Tree{Entries: entries}
-
 	data, err := EncodeTree(&tree)
 	if err != nil {
 		return nil, err

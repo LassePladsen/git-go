@@ -8,7 +8,6 @@ import (
 	"mygit/file"
 	"mygit/object"
 	"os"
-	"slices"
 )
 
 type Command = func(args []string) []byte
@@ -171,7 +170,7 @@ func lsTree(args []string) []byte {
 		} else {
 			// output: <mode> <kind> <hash>    <name>
 			hash := make([]byte, hex.EncodedLen(len(entry.Hash)))
-			hex.Encode(hash, entry.Hash)
+			hex.Encode(hash, []byte(entry.Hash))
 
 			kind, err := entry.Kind()
 			if err != nil {
@@ -180,8 +179,8 @@ func lsTree(args []string) []byte {
 			}
 
 			// dir mode 040000 is stored as 40000, so prepend the zero
-			if string(entry.Mode) == "40000" {
-				entry.Mode = slices.Insert(entry.Mode, 0, '0')
+			if entry.Mode == "40000" {
+				entry.Mode = "0" + entry.Mode
 			}
 
 			out = append(out, entry.Mode...)
