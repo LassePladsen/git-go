@@ -194,7 +194,7 @@ func lsTree(args []string) []byte {
 		}
 	}
 
-	return fmt.Appendln(out)
+	return out
 }
 
 // Create a tree object from current state of "staging area" (from git add)
