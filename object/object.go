@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"mygit/file"
 	"os"
 	"path/filepath"
@@ -326,7 +327,10 @@ func ParseFileMode(f *os.File) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("Could not stat file '%v' to parse mode: %w", f.Name(), err)
 	}
-	mode := stat.Mode()
+	return fileModeToGitMode(stat.Mode())
+}
+
+func fileModeToGitMode(mode fs.FileMode) (string, error) {
 	switch {
 	case mode.IsDir():
 		return "40000", nil
