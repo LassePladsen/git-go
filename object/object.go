@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/zlib"
 	"crypto/sha1"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -38,7 +39,7 @@ type RawObject struct {
 }
 
 func (o RawObject) String() string {
-	return fmt.Sprintf("RawObject{\n\tPath: %v\n\tHash:% v\n\tKind: %v\n\tSize: %v\n\tData: %v\n}",
+	return fmt.Sprintf("RawObject{\n\tPath: %v\n\tHash: %v\n\tKind: %v\n\tSize: %v\n\tData: %v\n}",
 		o.Path(), o.Hash, o.Kind, o.Size(), string(o.Data))
 }
 
@@ -168,10 +169,10 @@ func ParseTree(treeObj *RawObject) (*Tree, error) {
 	if treeObj.Kind != KindTree {
 		return nil, errors.New("Not a tree object")
 	}
-	// read format: <mode> <name>\0<20_byte_object_hash>
 	var tree Tree
 
 	// Loop entries until rest data is empty
+	// Each entry's format: <mode> <name>\0<20_byte_object_hash>
 	rest := treeObj.Data
 	for len(rest) > 0 {
 		var entry TreeEntry
@@ -190,7 +191,7 @@ func ParseTree(treeObj *RawObject) (*Tree, error) {
 		}
 		entry.Mode = string(mode)
 
-		rest = rest[i+1:] // skip space
+		rest = rest[i+1:] // skip the space
 
 		// Read name
 		var name []byte
@@ -206,7 +207,7 @@ func ParseTree(treeObj *RawObject) (*Tree, error) {
 		}
 		entry.Name = string(name)
 
-		rest = rest[i+1:] // skip null byte
+		rest = rest[i+1:] // skip the null byte
 
 		// Read 20 byte hash (its not stored as hex)
 		if len(rest) < 20 {
@@ -221,15 +222,39 @@ func ParseTree(treeObj *RawObject) (*Tree, error) {
 
 }
 
-// serialize a Tree into tree payload bytes ready to WriteObject
+// serialize a Tree into tree object's data bytes ready for WriteObject
+// TODO: some error here in output...
 func EncodeTree(tree *Tree) ([]byte, error) {
-	for _, entry := range tree.Entries {
-		fmt.Println("LP entry: ", entry)
+	var data []byte
 
+	// Loop entries until rest data is empty
+	for _, entry := range tree.Entries {
+		// dir mode 040000 should be stored as 40000
+		mode := entry.Mode
+		if mode == "040000" {
+			mode = "40000"
+		}
+
+		// Each entry's format: <mode> <name>\0<20_byte_object_hash>
+		// and there is no separator between entries. 
+
+		//note: hash will be output as 20 byte raw hash, not hex
+		rawHash, err := hex.DecodeString(entry.Hash)
+		if err != nil {
+			return nil, fmt.Errorf("Could not decode hash '%v' encode tree: %w", entry.Hash, err)
+		}
+
+		data = fmt.Appendf(data, "%v %v\x00%v", mode, entry.Name, string(rawHash))
 	}
-	os.Exit(0)
-	// TODO:
-	return []byte{}, nil
+
+	return data, nil
+}
+
+// These files or dirs will be ignored when writing a tree
+var filesIgnored map[string]bool = map[string]bool{
+	".mygit": true,
+	".git":   true,
+	// TODO: implement .mygitignore
 }
 
 // Walks directory path recursively, writes RawObjects for each entry, and finally writes the root Tree object
@@ -241,51 +266,57 @@ func WriteTree(path string) (*RawObject, error) {
 
 	// Iterate over files in path, create blobs for files and trees for dirs
 	entries := make([]*TreeEntry, len(dirEntries))
-	for i, dirEntry := range dirEntries {
+	var n int
+	for _, dirEntry := range dirEntries {
+		if _, ok := filesIgnored[dirEntry.Name()]; ok {
+			// ignored path, should make entires dynamically sliced with append() or somehow slice this index away?
+			continue
+		}
 		entryPath := filepath.Join(path, dirEntry.Name())
-		fmt.Println("LP entryPath: ", entryPath)
-		// TODO: implement mygitignore
+
 		if dirEntry.IsDir() {
 			obj, err := WriteTree(entryPath)
+			fmt.Printf("LP writing dir path '%v' to hash: %v\n", entryPath, obj.Hash)
 			if err != nil {
 				return nil, err
 			}
-			entries[i] = &TreeEntry{Hash: obj.Hash, Mode: "40000", Name: dirEntry.Name()}
+			entries[n] = &TreeEntry{Hash: obj.Hash, Mode: "40000", Name: dirEntry.Name()}
 		} else { // file
 			// open file and read
 			file, err := os.Open(entryPath)
 			if err != nil {
-				return nil, fmt.Errorf("Could not open file '%v' in to write tree: %w\n", dirEntry.Name(), err)
+				return nil, fmt.Errorf("Could not open file '%v' in to write tree: %w", dirEntry.Name(), err)
 			}
 			defer file.Close()
 
 			data, err := io.ReadAll(file)
 			if err != nil {
-				return nil, fmt.Errorf("Could not read file '%v' in to write tree: %w\n", dirEntry.Name(), err)
+				return nil, fmt.Errorf("Could not read file '%v' in to write tree: %w", dirEntry.Name(), err)
 			}
 
 			// Write object
 			obj, err := WriteObject(data, KindBlob)
+			fmt.Printf("LP wrote filepath '%v' to object hash: %v\n", entryPath, obj.Hash)
+
 			if err != nil {
-				return nil, fmt.Errorf("Could not write object for file '%v' to write tree: %w\n", dirEntry.Name(), err)
+				return nil, fmt.Errorf("Could not write object for file '%v' to write tree: %w", dirEntry.Name(), err)
 			}
 
 			// Store entry for tree
 			mode, err := ParseFileMode(file)
 			if err != nil {
-				return nil, fmt.Errorf("Could not parse file mode to git mode for file '%v' to write tree: %w\n", dirEntry.Name(), err)
+				return nil, fmt.Errorf("Could not parse file mode to git mode for file '%v' to write tree: %w", dirEntry.Name(), err)
 			}
-			entries[i] = &TreeEntry{Name: dirEntry.Name(), Mode: mode, Hash: obj.Hash}
+			entries[n] = &TreeEntry{Name: dirEntry.Name(), Mode: mode, Hash: obj.Hash}
 		}
-
+		n++
 	}
 
-	tree := Tree{Entries: entries}
+	tree := Tree{Entries: entries[:n]} // slice away the end to skip the nil entries we ignored
 	data, err := EncodeTree(&tree)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Could not encode tree for path '%v': %w", path, err)
 	}
-
 	return WriteObject(data, KindTree)
 }
 
@@ -293,7 +324,7 @@ func WriteTree(path string) (*RawObject, error) {
 func ParseFileMode(f *os.File) (string, error) {
 	stat, err := f.Stat()
 	if err != nil {
-		return "", fmt.Errorf("Could not stat file '%v' to parse mode: %w\n", f.Name(), err)
+		return "", fmt.Errorf("Could not stat file '%v' to parse mode: %w", f.Name(), err)
 	}
 	mode := stat.Mode()
 	switch {
